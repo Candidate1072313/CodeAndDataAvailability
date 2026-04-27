@@ -1,0 +1,355 @@
+---
+title: "Candidate1072313"
+format: html
+editor: visual
+---
+
+# Loading and installing packages
+
+```{r}
+install.packages("ggplot2")
+install.packages("sf")
+install.packages("rgbif")
+install.packages("dplyr")
+install.packages("tidyverse")
+install.packages("magick")
+install.packages("spData")
+install.packages("tibble")
+install.packages("patchwork")
+install.packages("paletteer")
+install.packages("networkD3")
+install.packages("plotly")
+
+library(ggplot2)
+library(sf)
+library(rgbif)
+library(dplyr)
+library(tidyverse)
+library(magick)
+library(spData)
+library(tibble)
+library(patchwork)
+library(paletteer)
+library(networkD3)
+library(plotly)
+```
+
+# Downloading, installing and loading data
+
+1.  Mae Suai
+
+```{r}
+#Downloading
+maeSuai <- occ_download(
+    pred_default(), 
+    pred("gadm", "THA.11.10_1"),
+    pred("hasCoordinate", TRUE),
+    pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
+    format = "SIMPLE_CSV"
+  )
+
+#Status of the download
+occ_download_meta(maeSuai) 
+
+#Unpacking from a download into a zip, and then importing as a dataframe
+maeSuai_get <- occ_download_get(maeSuai, overwrite = TRUE) # Adding as a zip
+maeSuai_data <- occ_download_import(maeSuai_get) # Adding as a dataframe
+View(maeSuai_data)
+
+#Checking for duplicates
+duplicated(maeSuai_data) #No duplicates found
+
+#Saving the file to my laptop so that I can use it for QGIS
+write.csv(maeSuai_data,"maeSuai.csv", row.names = FALSE)
+```
+
+2.  Chiang Rai
+
+```{r}
+#Downloading
+chiangRai <- occ_download(
+  pred_default(), 
+  pred("gadm", "THA.11_1"),
+  pred("hasCoordinate", TRUE),
+  pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
+  format = "SIMPLE_CSV"
+)
+
+#Status of the download
+occ_download_meta(chiangRai)
+
+#Unpacking from a download into a zip, and then importing as a dataframe
+chiangRai_get <- occ_download_get(chiangRai, overwrite = TRUE) # Adding as a zip
+chiangRai_data <- occ_download_import(chiangRai_get) # Adding as a dataframe
+View(chiangRai_data)
+
+#Checking for duplicates
+duplicated(chiangRai_data) #No duplicates found
+
+#Saving the file to my laptop so that I can use it for QGIS 
+write.csv(chiangRai_data,"chiangRai.csv", row.names = FALSE)
+```
+
+3.  Thailand
+
+```{r}
+#Downloading
+thailand <- occ_download(
+  pred_default(), 
+  pred("country", "TH"),
+  pred("hasCoordinate", TRUE),
+  pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
+  format = "SIMPLE_CSV"
+)
+
+#Status of the download
+occ_download_meta(thailand)
+
+#Unpacking from a download into a zip, and then importing as a dataframe
+thailand_get <- occ_download_get(thailand, overwrite = TRUE) # Adding as a zip
+thailand_data <- occ_download_import(thailand_get) # Adding as a dataframe
+View(thailand_data)
+
+#Checking for duplicates
+duplicated(thailand_data) #No duplicates found
+
+#Saving the file to my laptop so that I can use it for QGIS 
+write.csv(thailand_data,"thailand.csv", row.names = FALSE)
+```
+
+# Statistical analysis
+
+```{r}
+#This data is taken from GBIF Species List for Thailand
+thailandSpeciesList <- read.csv("thailandSpeciesList.csv")
+classCountsTH <- thailandSpeciesList %>%
+  group_by(class) %>%
+  summarise(n_species = n_distinct(species))
+classCountsTH
+classCounts <- thailandSpeciesList %>%
+  group_by(class) %>%
+  summarise(n_occ = n())
+
+thailandClasses <- c("agaricomycetes", "amphibia", "arachnida", "aves", "diplopoda", "gastropoda", "insecta", "liliopsida", "magnoliopsida", "mammalia", "squamata")
+thailandCounts <- c(900, 223, 637, 1240, 142, 1343, 11729, 2680, 7699, 369, 466)
+thailandClassCounts <- data.frame(thailandClasses, thailandCounts)
+thailandClassCounts
+
+write.csv(thailandClassCounts,"thailandClassCounts.csv", row.names = FALSE)
+
+#Using dplyr package to group the data by class
+classCounts <- maeSuai_data %>%
+  group_by(class) %>%
+  summarise(n_species = n_distinct(species))
+classCounts
+
+maeSuaiClasses <- c("agaricomycetes", "amphibia", "arachnida", "aves", "diplopoda", "gastropoda", "insecta", "liliopsida", "magnoliopsida", "mammalia", "squamata")
+maeSuaiCounts <- c(1, 1, 6, 144, 1, 2, 94, 4, 27, 1, 6)
+maeSuaiClassCounts <- data.frame(maeSuaiClasses, maeSuaiCounts)
+
+write.csv(maeSuaiClassCounts,"maeSuaiClassCounts.csv", row.names = FALSE)
+
+
+#expected proportion will be the total for the expected counts, divded by their class
+#e.g., Plants = 15000/46312 = 0.324
+sum(thailandCounts) # sum is 27428
+expected <- (thailandCounts / 27428)
+expected
+
+sum(maeSuaiCounts)
+287*expected #287 is the sum of the observed Mae Suai counts
+
+## For a chi-squared test, all categories must have an expected proportion greater than 5.
+##Therefore, must group all categories <5, which are Amphibians, Diplopoda, Mammalia
+maeSuaiClassesGrouped <- c("agaricomycetes", "arachnida", "aves", "gastropoda", "insecta", "liliopsida", "magnoliopsida", "squamata", "other")
+maeSuaiCountsGrouped <- c(1, 6, 144, 2, 94, 4, 27, 6, 3)
+maeSuaiClassCountsGrouped <- data.frame(maeSuaiClassesGrouped, maeSuaiCountsGrouped)
+maeSuaiClassCountsGrouped
+
+thailandClassesGrouped <- c("agaricomycetes", "arachnida", "aves", "gastropoda", "insecta", "liliopsida", "magnoliopsida", "squamata", "other")
+thailandCountsGrouped <- c(900, 637, 1240, 1343, 11729, 2680, 7699, 466, 734)
+thailandClassCountsGrouped <- data.frame(thailandClassesGrouped, thailandCountsGrouped)
+thailandClassCountsGrouped
+
+##CHECK AGAIN
+sum(thailandCountsGrouped) # sum is 27428
+expectedGroups <- (thailandCountsGrouped / 27428)
+expectedGroups
+sum(maeSuaiCountsGrouped)
+287*expectedGroups #287 is the sum of the observed Mae Suai counts
+
+###RUN CHI-SQUARED TEST
+chisq.test(maeSuaiCountsGrouped, p = expectedGroups)
+```
+
+# Analysis of source data
+
+```{r}
+source_countsSuai <- maeSuai_data %>%
+  group_by(institutionCode) %>%
+  summarise(n_occ = n()) %>%
+  mutate(percentage = n_occ / sum(n_occ) * 100)
+source_countsSuai
+
+p1 <- source_countsSuai %>%
+  arrange(desc(percentage)) %>%
+  ggplot(aes(x = "", y = percentage, fill = reorder(institutionCode, percentage))) +
+  geom_col(width = 0.5) +
+  labs(fill = "Legend",  y = NULL, x = "Mae Suai") +
+  scale_fill_manual(
+    values = c("#A0CBE8", "#D37295", "#8CD17D"),
+    labels = c("Uncategorised", "iNaturalist", "eBird")) +
+  theme_bw() +
+  coord_flip()
+p1 <- p1 + theme(legend.position = "none")
+p1
+
+source_countsRai <- chiangRai_data %>%
+  group_by(institutionCode) %>%
+  summarise(n_occ = n()) %>%
+  mutate(percentage = n_occ / sum(n_occ) * 100)
+source_countsRai
+
+p2 <- source_countsRai %>%
+  arrange(desc(percentage)) %>%
+  ggplot(aes(x = "", y = percentage, fill = reorder(institutionCode, percentage))) +
+  geom_col(width = 0.5) +
+  labs(fill = "Legend",  y = NULL, x = "Chiang Rai") +
+  scale_fill_manual(
+    values = c("#F1CE63", "#B07AA1", "#B6992D", "#A0CBE8", "#D37295", "#8CD17D"),
+    labels = c("NABU", "ZFMK", "UARK", "Uncategorised", "iNaturalist", "eBird")) +
+  theme_bw() +
+  coord_flip()
+p2 <- p2 + theme(legend.position = "none")
+p2
+
+source_countsThai <- thailand_data %>%
+  group_by(institutionCode) %>%
+  summarise(n_occ = n()) %>%
+  mutate(percentage = n_occ / sum(n_occ) * 100)
+source_countsThai
+
+source_countsThai_collapsed <- source_countsThai %>%
+  mutate(institutionCode = ifelse(percentage < 0.1,
+                                  "Other",
+                                  institutionCode)) %>%
+  group_by(institutionCode) %>%
+  summarise(percentage = sum(percentage), .groups = "drop")
+source_countsThai_collapsed
+
+p3 <- source_countsThai_collapsed %>%
+  arrange(desc(percentage)) %>%
+  ggplot(aes(x = "", y = percentage, fill = reorder(institutionCode, percentage))) +
+  geom_col(width = 0.5) +
+  labs(fill = "Legend",  y = "Institution Code for each GBIF Occurrence", x = "Thailand") +
+  scale_fill_manual(
+    values = c("#499894", "#F1CE63", "#9D7660", "#A0CBE8", "#D37295", "#8CD17D"),
+    labels = c( "Other", "NABU", "VecB", "Uncategorised", "iNaturalist", "eBird (CLO)"))  +
+  theme_bw() +
+  coord_flip()
+p3
+
+(p1 / p2 / p3) 
+```
+
+```{r}
+#Creating the Institution Code and Phylum only dataframe
+df_sankey <- maeSuai_data %>%
+  group_by(institutionCode, class) %>%
+  summarise(value = n(), .groups = "drop")
+df_sankey
+
+##Note that there are uncategorised values in the institutionCode column, as well as class. These will get confused in the final Sankey diagram. I will change the 'institutionCode' to say 'Uncategorised', and the 'class' to say 'Other'
+df_sankey[df_sankey == ''] <- 'Uncategorised'
+df_sankey
+#Now to just change the class column
+df_sankey["class"][df_sankey["class"] == 'Uncategorised'] <- 'Other'
+df_sankey
+
+#Creating the nodes (either axis)
+nodes <- data.frame(name = unique(c(df_sankey$institutionCode, df_sankey$class)))
+
+#Creating the links (the 'joiners')
+links <- df_sankey %>%
+  mutate(
+    source = match(institutionCode, nodes$name) - 1,
+    target = match(class, nodes$name) - 1
+  ) %>%
+  select(source, target, value)
+
+pal <- paletteer::paletteer_d("ggthemes::Tableau_20")
+
+#Plotting the graph
+fig <- plot_ly(
+  type = "sankey",
+  visible = TRUE,
+  alpha = 0.1,
+  orientation = "h",
+  node = list(
+    label = nodes$name,
+    pad = 15,
+    thickness = 15,
+    line = list(color = "black", width = 0.5)),
+  link = list(
+    source = links$source,
+    target = links$target,
+    value = links$value))
+fig <- fig %>% layout(
+  title = "Taxonomic and source composition of GBIF data",
+  font = list(size = 12))
+fig
+```
+
+# Time
+
+```{r}
+#Time - Mae Suai
+t1 <- ggplot(maeSuai_data, aes(x = year)) +
+  geom_histogram(binwidth = 1, fill = "#FF6347", color = "black") +
+  scale_x_continuous(breaks = seq(min(maeSuai_data$year, na.rm = TRUE),
+                                  max(maeSuai_data$year, na.rm = TRUE),
+                                  by = 5)) +
+  labs(title = "Mae Suai",
+       x = NULL,
+       y = NULL) +
+  theme_classic(base_size = 13) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 8)
+  )
+t1
+
+t2 <- ggplot(chiangRai_data, aes(x = year)) +
+  geom_histogram(binwidth = 1, fill = "#9CAF88", color = "black") +
+  scale_x_continuous(breaks = seq(min(chiangRai_data$year, na.rm = TRUE),
+                                  max(chiangRai_data$year, na.rm = TRUE),
+                                  by = 5)) +
+  labs(title = "Chiang Rai",
+       x = NULL,
+       y = "Number of Records") +
+  theme_classic(base_size = 13) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 8)
+  )
+t2
+
+#Time - Thailand
+t3 <- ggplot(thailand_data, aes(x = year)) +
+  geom_histogram(binwidth = 1, fill = "#4E97D1", color = "black") +
+  scale_x_continuous(breaks = seq(min(thailand_data$year, na.rm = TRUE),
+                                  max(thailand_data$year, na.rm = TRUE),
+                                  by = 5)) +
+  labs(title = "Thailand",
+       x = "Year",
+       y = NULL) +
+  theme_classic(base_size = 13) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 8)
+  )
+t3
+
+
+t1 / t2 / t3
+```
